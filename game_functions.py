@@ -21,27 +21,15 @@ def check_key_down_event():
     return None
 
 
-# def check_keyup_event():
-#     if event.key == pg.K_RIGHT:
-#         for ship in ships:
-#             ship.moving_right = True
-#     elif event.key == pg.K_LEFT:
-#         for ship in ships:
-#             ship.moving_left = True
-
-
-def check_events(pacman):
+def check_events():
     for event in pg.event.get():
         if event.type == pg.QUIT:
             sys.exit()
-        # if event.type == pg.KEYDOWN:
-        #     check_keydown_event(event)
-        # if event.type == pg.KEYUP:
-        #     check_keyup_event(event)
 
 
-def update_screen(settings, screen, pacman, grid_pts):
+def update_screen(settings, screen, pacman, grid_pts, foods):
     screen.fill(settings.bg_color)
-    grid_pts.render(screen)
+    grid_pts.draw()
+    foods.draw()
     pacman.draw()
     pg.display.flip()

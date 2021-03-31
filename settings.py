@@ -12,3 +12,11 @@ class Settings:
         self.character_speed = 100
         self.pacman_color = (255, 255, 0)
         self.radius = 10
+        self.collide_radius = 5
+
+        self.food_points = 10
+        self.food_radius = 5
+
+        self.power_up_points = 20
+        self.power_up_radius = 7.5
+        self.flash_t = 0.1
