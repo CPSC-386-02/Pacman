@@ -1,7 +1,7 @@
 import pygame as pg
 from settings import Settings
 import game_functions as gf
-from character import Pacman
+from character import Pacman, Ghost_Group
 from maze import Grid_Pnts_Group, FoodGroup
 
 
@@ -18,16 +18,18 @@ class Game:
         self.grid_pts = Grid_Pnts_Group(settings=self.settings, screen=self.screen, txt_file="mazetest.txt")
         self.foods = FoodGroup(settings=self.settings, screen=self.screen, food_file="food.txt")
         self.pacman = Pacman(settings=self.settings, screen=self.screen, grid_pts=self.grid_pts, foods=self.foods)
-
+        self.ghosts = Ghost_Group(settings=self.settings, screen=self.screen, grid_pts=self.grid_pts)
         self.play()
 
     def play(self):
         while True:
             dt = self.clock.tick(30) / 1000.0
-            self.pacman.update(dt=dt)
+            self.pacman.update(dt=dt, ghosts=self.ghosts)
+            self.ghosts.update(dt=dt, pacman=self.pacman)
             self.foods.update(dt=dt)
             gf.check_events()
-            gf.update_screen(settings=self.settings, screen=self.screen, pacman=self.pacman, grid_pts=self.grid_pts, foods=self.foods)
+            gf.update_screen(settings=self.settings, screen=self.screen, pacman=self.pacman, grid_pts=self.grid_pts, foods=self.foods,
+                             ghosts=self.ghosts)
 
 
 

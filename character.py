@@ -1,6 +1,9 @@
+from random import randint
+
 import pygame as pg
 from vector import Vector
 import game_functions as gf
+from stack import Stack
 
 
 class Character:
@@ -41,36 +44,16 @@ class Character:
             self.current_grid_pt = self.current_grid_pt.portal
             self.position = self.current_grid_pt.position.copy()
 
-    def update(self, dt):
-        self.position += self.direction * self.settings.character_speed * dt
-        if self.direction is not gf.direction["STOP"]:
-            if self.check_nxt_grid_pt():
-                self.current_grid_pt = self.nxt_grid_pt
-                self.portal()
-                if self.current_grid_pt.neighbors[self.direction] is not None:
-                    self.nxt_grid_pt = self.current_grid_pt.neighbors[self.direction]
-                else:
-                    self.position = self.current_grid_pt.position.copy()
-                    self.direction = gf.direction["STOP"]
-
     def draw(self):
         if self.appear:
             position = self.position.asInt()
-            pg.draw.circle(self.screen, self.settings.pacman_color, position, self.settings.radius)
+            pg.draw.circle(self.screen, self.color, position, self.settings.radius)
 
 
 class Pacman(Character):
     def __init__(self, settings, screen, grid_pts, foods):
         super().__init__(settings, screen, grid_pts)
-        self.settings = settings
-        self.screen = screen
-        self.direction = gf.direction["STOP"]
-
-        self.grid_pts = grid_pts
-        self.current_grid_pt = grid_pts.grid_pts_li[0]
-        self.nxt_grid_pt = self.current_grid_pt
-        self.position = self.current_grid_pt.position.copy()
-
+        self.color = self.settings.pacman_color
         self.food_list = foods.food_list
 
     def move_by_key(self, direction):
@@ -85,10 +68,17 @@ class Pacman(Character):
                 self.current_grid_pt = self.nxt_grid_pt
                 self.portal()
                 if self.current_grid_pt.neighbors[direction] is not None:
-                    self.nxt_grid_pt = self.current_grid_pt.neighbors[direction]
-                    if self.direction != direction:
-                        self.position = self.current_grid_pt.position.copy()
-                        self.direction = direction
+                    if self.current_grid_pt.ghost_home_entrance:
+                        if self.current_grid_pt.neighbors[self.direction] is not None:
+                            self.nxt_grid_pt = self.current_grid_pt.neighbors[self.direction]
+                        else:
+                            self.position = self.current_grid_pt.position.copy()
+                            self.direction = gf.direction["STOP"]
+                    else:
+                        self.nxt_grid_pt = self.current_grid_pt.neighbors[direction]
+                        if self.direction != direction:
+                            self.position = self.current_grid_pt.position.copy()
+                            self.direction = direction
                 else:
                     if self.current_grid_pt.neighbors[self.direction] is not None:
                         self.nxt_grid_pt = self.current_grid_pt.neighbors[self.direction]
@@ -96,15 +86,28 @@ class Pacman(Character):
                         self.position = self.current_grid_pt.position.copy()
                         self.direction = gf.direction["STOP"]
 
-    def eat(self):
+    def eat_food(self, ghosts):
         for food in self.food_list:
             dist = (self.position - food.position).magnitudeSquared()
             radius = (food.radius + self.settings.collide_radius) ** 2
             if dist <= radius:
                 self.food_list.remove(food)
+                if food.name == "power up":
+                    ghosts.running_away_mode()
         return None
 
-    def update(self, dt):
+    def eat_ghost(self, ghosts):
+        for ghost in ghosts:
+            dist = (self.position - ghost.position).magnitudeSquared()
+            radius = (self.settings.ghost_collide_radius + self.settings.collide_radius) ** 2
+            if dist <= radius:
+                if ghost is not None:
+                    if ghost.mode.name == "RUN":
+                        ghost.spawn_mode(2)
+
+        return None
+
+    def update(self, dt, ghosts):
         self.position += self.direction * self.settings.character_speed * dt
         direction = gf.check_key_down_event()
         if direction:
@@ -119,9 +122,238 @@ class Pacman(Character):
                     else:
                         self.position = self.current_grid_pt.position.copy()
                         self.direction = gf.direction["STOP"]
-        self.eat()
+        self.eat_food(ghosts)
+        self.eat_ghost(ghosts)
+
+
+
+class Ghost(Character):
+    def __init__(self, settings, screen, grid_pts):
+        super().__init__(settings, screen, grid_pts)
+        self.goal = Vector()
+        self.mode_stack = self.setup_modes()
+        self.mode = self.mode_stack.pop()
+        self.mode_timer = 0
+        self.spawn_pt = self.find_spawn_pt()
+
+    def directions(self):
+        directions = []
+        for key in self.current_grid_pt.neighbors.keys():
+            if self.current_grid_pt.neighbors[key] is not None:
+                if key != self.direction * -1:
+                    directions.append(key)
+        if len(directions) == 0:
+            directions.append(self.back_track())
+        return directions
+
+    def closest_direction(self, directions):
+        distances = []
+        for direction in directions:
+            diff_vec = self.current_grid_pt.position + direction * self.settings.tile_width - self.goal
+            distances.append(diff_vec.magnitudeSquared())
+        index = distances.index(min(distances))
+        return directions[index]
+
+    def randomize_direction(self, directions):
+        print(directions)
+        index = randint(0, len(directions) - 1)
+        return directions[index]
+
+    def back_track(self):
+        if self.direction * -1 == gf.direction["UP"]:
+            return gf.direction["UP"]
+        if self.direction * -1 == gf.direction["DOWN"]:
+            return gf.direction["DOWN"]
+        if self.direction * -1 == gf.direction["LEFT"]:
+            return gf.direction["LEFT"]
+        if self.direction * -1 == gf.direction["RIGHT"]:
+            return gf.direction["RIGHT"]
+
+    def running_away_mode(self):
+        if self.mode.name != "SPAWN":
+            if self.mode.name != "RUN":
+                if self.mode.time is not None:
+                    dt = self.mode.time - self.mode_timer
+                    self.mode_stack.push(Mode(self.mode.name, dt))
+                else:
+                    self.mode_stack.push(Mode(self.mode.name))
+                self.mode = Mode("RUN", 7, 0.5)
+                self.mode_timer = 0
+            else:
+                self.mode = Mode("RUN", 7, 0.5)
+                self.mode_timer = 0
+            self.reverse_direction()
+
+    def spawn_mode(self, speed_up_scale):
+        self.mode = Mode("SPAWN", None, speed_up_scale)
+        self.mode_timer = 0
+
+    def find_spawn_pt(self):
+        for grid_pt in self.grid_pts.ghost_home_li:
+            if grid_pt.ghost_spawn_pt:
+                break
+        return grid_pt
+
+    def spawn_goal(self):
+        self.goal = self.spawn_pt.position
+
+    def random_goal(self):
+        x = randint(0, self.settings.screen_width)
+        y = randint(0, self.settings.screen_height)
+        self.goal = Vector(x, y)
+
+    def setup_modes(self):
+        modes = Stack()
+        modes.push(Mode(name="CHASE"))
+        modes.push(Mode(name="SCATTER", time=5))
+        modes.push(Mode(name="CHASE", time=20))
+        modes.push(Mode(name="SCATTER", time=7))
+        modes.push(Mode(name="CHASE", time=20))
+        modes.push(Mode(name="SCATTER", time=7))
+        modes.push(Mode(name="CHASE", time=20))
+        modes.push(Mode(name="SCATTER", time=7))
+        return modes
+
+    def scatter_goal(self):
+        self.goal = Vector((self.settings.screen_width, self.settings.screen_height)[0], 0)
+
+    def chase_goal(self, pacman, blinky=None):
+        self.goal = pacman.position
+
+    def mode_update(self, dt):
+        self.mode_timer += dt
+        if self.mode.time is not None:
+            if self.mode_timer >= self.mode.time:
+                self.reverse_direction()
+                self.mode = self.mode_stack.pop()
+                self.mode_timer = 0
+
+    # def portalSlowdown(self):
+    #     self.speed = 100
+    #     if self.current_grid_pt.portal or self.nxt_grid_pt.portal:
+    #         self.speed = 50
+
+    # def update(self, dt):
+    #     self.position += self.direction * self.settings.ghost_speed * dt
+    #     if self.check_nxt_grid_pt():
+    #         self.current_grid_pt = self.nxt_grid_pt
+    #         self.portal()
+    #         directions = self.directions()
+    #         self.direction = self.getClosestDirection(directions)
+    #         self.nxt_grid_pt = self.current_grid_pt.neighbors[self.direction]
+    #         self.position = self.current_grid_pt.position.copy()
+
+    def update(self, dt, pacman, blinky=None):
+        self.appear = True
+        speedMod = self.settings.ghost_speed * self.mode.speed_up_scale
+        self.position += self.direction * speedMod * dt
+        self.mode_update(dt)
+        if self.mode.name == "CHASE":
+            self.chase_goal(pacman, blinky)
+        elif self.mode.name == "SCATTER":
+            self.scatter_goal()
+        elif self.mode.name == "RUN":
+            self.random_goal()
+        elif self.mode.name == "SPAWN":
+            self.spawn_goal()
+        if self.check_nxt_grid_pt():
+            self.current_grid_pt = self.nxt_grid_pt
+            self.portal()
+            directions = self.directions()
+            self.direction = self.closest_direction(directions)
+            self.nxt_grid_pt = self.current_grid_pt.neighbors[self.direction]
+            self.position = self.current_grid_pt.position.copy()
+            if self.mode.name == "SPAWN":
+                if self.position == self.goal:
+                    self.mode = self.mode_stack.pop()
+
+
+class Mode:
+    def __init__(self, name="", time=None, speed_up_scale=1, direction=None):
+        self.name = name
+        self.time = time
+        self.speed_up_scale = speed_up_scale
+        self.direction = direction
+
+
+class Blinky(Ghost):
+    def __init__(self, settings, screen, grid_pts):
+        super().__init__(settings, screen, grid_pts)
+        self.color = self.settings.blinky_color
+
+
+class Pinky(Ghost):
+    def __init__(self, settings, screen, grid_pts):
+        super().__init__(settings, screen, grid_pts)
+        self.color = self.settings.pinky_color
+
+    def scatter_goal(self):
+        self.goal = Vector()
+
+    def chase_goal(self, pacman, blinky=None):
+        self.goal = pacman.position + pacman.direction * self.settings.tile_width * 4
+
+
+class Inky(Ghost):
+    def __init__(self, settings, screen, grid_pts):
+        super().__init__(settings, screen, grid_pts)
+        self.color = self.settings.inky_color
+
+    def scatter_goal(self):
+        self.goal = Vector(self.settings.screen_width, self.settings.screen_height)
+
+    def chase_goal(self, pacman, blinky=None):
+        vec = pacman.position + pacman.direction * self.settings.tile_width * 4 * 2
+        self.goal = blinky.position + (vec - blinky.position) * 2
+
+
+class Clyde(Ghost):
+    def __init__(self, settings, screen, grid_pts):
+        super().__init__(settings, screen, grid_pts)
+        self.color = self.settings.clyde_color
+
+    def scatter_goal(self):
+        self.goal = Vector(0, self.settings.screen_height)
+
+    def chase_goal(self, pacman, blinky=None):
+        dist = (pacman.position - self.position).magnitudeSquared()
+        if dist <= (self.settings.tile_width * 8) ** 2:
+            self.scatter_goal()
+        else:
+            self.goal = pacman.position + pacman.direction * self.settings.tile_width * 4
+
+
+class Ghost_Group():
+    def __init__(self, settings, screen, grid_pts):
+        self.settings = settings
+        self.screen = screen
+        self.grid_pts = grid_pts
+        self.ghosts = [Blinky(self.settings, self.screen, grid_pts), Pinky(self.settings, self.screen, grid_pts),
+                       Inky(self.settings, self.screen, grid_pts), Clyde(self.settings, self.screen, grid_pts)]
+
+    def __iter__(self):
+        return iter(self.ghosts)
+
+    def update(self, dt, pacman):
+        for ghost in self:
+            ghost.update(dt, pacman, self.ghosts[0])
+
+    def running_away_mode(self):
+        for ghost in self:
+            ghost.running_away_mode()
+
+    # def update_points(self):
+    #     for ghost in self:
+    #         ghost.points *= 2
+    #
+    # def resetPoints(self):
+    #     for ghost in self:
+    #         ghost.points = 200
+
+    def hide(self):
+        for ghost in self:
+            ghost.appear = False
 
     def draw(self):
-        p = self.position.asInt()
-        pg.draw.circle(self.screen, self.settings.pacman_color, p, self.settings.radius)
-
+        for ghost in self:
+            ghost.draw()

@@ -20,3 +20,12 @@ class Settings:
         self.power_up_points = 20
         self.power_up_radius = 7.5
         self.flash_t = 0.1
+
+        self.ghost_points = 100
+        self.ghost_speed = 75
+        self.ghost_collide_radius = 5
+
+        self.blinky_color = (255, 0, 0)
+        self.pinky_color = (255, 100, 150)
+        self.inky_color = (100, 255, 255)
+        self.clyde_color = (230, 190, 40)

@@ -14,6 +14,9 @@ class Grid_Pnt:
                           gf.direction["LEFT"]: None, gf.direction["RIGHT"]: None}
         self.portal = None
         self.portal_val = 0
+        self.ghost_home = False
+        self.ghost_home_entrance = False
+        self.ghost_spawn_pt = False
 
     def draw(self):
         for n in self.neighbors.keys():
@@ -28,29 +31,45 @@ class Grid_Pnts_Group:
     def __init__(self, settings, screen, txt_file):
         self.settings = settings
         self.screen = screen
-        self.portal_sym = ["1"]
-        self.grid_pt_sym = ["+"]+ ["1"]
+
+        self.grid_pt_sym = ["+"] + ["1"] + ["H"] + ["S"]
+
         self.grid_pts_li = []
+        self.ghost_home_li = []
+
         self.stack = Stack()
-        self.create_list(settings, screen, txt_file, self.grid_pts_li)
+        self.maze_grid = self.read_file(txt_file)
+        self.ghost_home_grid = self.ghost_home()
+
+        self.create_list(settings, screen, self.maze_grid, self.grid_pts_li)
+        self.create_list(settings, screen, self.ghost_home_grid, self.ghost_home_li)
+        print(self.ghost_home_li)
         self.create_portal()
+        self.go_home()
+        self.ghost_home_li[0].ghost_home_entrance = True
+
+    def ghost_home(self):
+        return [['0', '0', '+', '0', '0'],
+            ['0', '0', '|', '0', '0'],
+            ['+', '0', '|', '0', '+'],
+            ['+', '-', 'S', '-', '+'],
+            ['+', '0', '0', '0', '+']]
 
     def read_file(self, txt_file):
         f = open(txt_file, "r")
         lines = [line.rstrip('\n') for line in f]
         return [line.split(' ') for line in lines]
 
-    def create_list(self, settings, screen, txt_file, grid_pts_li):
-        self.grid = self.read_file(txt_file)
-        self.stack.push(self.find_first_pt(settings, screen, len(self.grid), len(self.grid[0])))
+    def create_list(self, settings, screen, grid, grid_pts_li):
+        self.stack.push(self.find_first_pt(settings, screen, grid))
         while not self.stack.isEmpty():
             grid_pt = self.stack.pop()
             self.add_to_list(grid_pt, grid_pts_li)
 
-            left_neighbor = self.get_neighbor(settings, screen, gf.direction["LEFT"], grid_pt.row, grid_pt.column - 1, grid_pts_li)
-            right_neighbor = self.get_neighbor(settings, screen, gf.direction["RIGHT"], grid_pt.row, grid_pt.column + 1, grid_pts_li)
-            up_neighbor = self.get_neighbor(settings, screen, gf.direction["UP"], grid_pt.row - 1, grid_pt.column, grid_pts_li)
-            down_neighbor = self.get_neighbor(settings, screen, gf.direction["DOWN"], grid_pt.row + 1, grid_pt.column, grid_pts_li)
+            left_neighbor = self.get_neighbor(settings, screen, gf.direction["LEFT"], grid_pt.row, grid_pt.column - 1, grid_pts_li, grid)
+            right_neighbor = self.get_neighbor(settings, screen, gf.direction["RIGHT"], grid_pt.row, grid_pt.column + 1, grid_pts_li, grid)
+            up_neighbor = self.get_neighbor(settings, screen, gf.direction["UP"], grid_pt.row - 1, grid_pt.column, grid_pts_li, grid)
+            down_neighbor = self.get_neighbor(settings, screen, gf.direction["DOWN"], grid_pt.row + 1, grid_pt.column, grid_pts_li, grid)
 
             grid_pt.neighbors[gf.direction["LEFT"]] = left_neighbor
             grid_pt.neighbors[gf.direction["RIGHT"]] = right_neighbor
@@ -62,18 +81,18 @@ class Grid_Pnts_Group:
             self.add_to_stack(up_neighbor, grid_pts_li)
             self.add_to_stack(down_neighbor, grid_pts_li)
 
-    def find_first_pt(self, settings, screen, rows, cols):
-        for row in range(rows):
-            for col in range(cols):
-                if self.grid[row][col] in self.grid_pt_sym:
+    def find_first_pt(self, settings, screen, grid):
+        for row in range(len(grid)):
+            for col in range(len(grid[0])):
+                if grid[row][col] in self.grid_pt_sym:
                     grid_pt = Grid_Pnt(settings, screen, row, col)
-                    if self.grid[row][col] in self.portal_sym:
-                        grid_pt.portal_val = self.grid[row][col]
+                    if grid[row][col] == "1":
+                        grid_pt.portal_val = grid[row][col]
                     return grid_pt
         return None
 
-    def get_neighbor(self, settings, screen, direction, row, col, grid_pts_li):
-        neighbor = self.follow_path(settings, screen, direction, row, col)
+    def get_neighbor(self, settings, screen, direction, row, col, grid_pts_li, grid):
+        neighbor = self.follow_path(settings, screen, direction, row, col, grid)
         if neighbor is not None:
             for pt in grid_pts_li:
                 if neighbor.position.x == pt.position.x and neighbor.position.y == pt.position.y:
@@ -94,54 +113,94 @@ class Grid_Pnts_Group:
                 return True
         return False
 
-    def follow_path(self, settings, screen, direction, row, col):
-        rows = len(self.grid)
-        columns = len(self.grid[0])
+    def follow_path(self, settings, screen, direction, row, col, grid):
+        rows = len(grid)
+        columns = len(grid[0])
         if direction == gf.direction["LEFT"] and col >= 0:
-            return self.path_to_follow(settings, screen, gf.direction["LEFT"], row, col, "-")
+            return self.path_to_follow(settings, screen, gf.direction["LEFT"], row, col, "-", grid)
         elif direction == gf.direction["RIGHT"] and col < columns:
-            return self.path_to_follow(settings, screen, gf.direction["RIGHT"], row, col, "-")
+            return self.path_to_follow(settings, screen, gf.direction["RIGHT"], row, col, "-", grid)
         elif direction == gf.direction["UP"] and row >= 0:
-            return self.path_to_follow(settings, screen, gf.direction["UP"], row, col, "|")
+            return self.path_to_follow(settings, screen, gf.direction["UP"], row, col, "|", grid)
         elif direction == gf.direction["DOWN"] and row < rows:
-            return self.path_to_follow(settings, screen, gf.direction["DOWN"], row, col, "|")
+            return self.path_to_follow(settings, screen, gf.direction["DOWN"], row, col, "|", grid)
         else:
             return None
 
-    def path_to_follow(self, settings, screen, direction, row, col, path):
-        if self.grid[row][col] == path:
-            while self.grid[row][col] not in self.grid_pt_sym:
+    def path_to_follow(self, settings, screen, direction, row, col, path, grid):
+        if grid[row][col] == path:
+            while grid[row][col] not in self.grid_pt_sym:
                 if direction is gf.direction["LEFT"]:   col -= 1
                 elif direction is gf.direction["RIGHT"]:    col += 1
                 elif direction is gf.direction["UP"]:   row -= 1
                 elif direction is gf.direction["DOWN"]: row += 1
             grid_pt = Grid_Pnt(settings, screen, row, col)
-            if self.grid[row][col] in self.portal_sym:
-                grid_pt.portal_val = self.grid[row][col]
+            if grid[row][col] == "1":
+                grid_pt.portal_val = grid[row][col]
+            if grid[row][col] == "H":
+                grid_pt.ghost_home = True
+            if grid[row][col] == "S":
+                grid_pt.ghost_spawn_pt = True
             return grid_pt
         else:
             return None
 
     def create_portal(self):
-        portalDict = {}
+        portal_dict = {}
         for i in range(len(self.grid_pts_li)):
             if self.grid_pts_li[i].portal_val != 0:
-                if self.grid_pts_li[i].portal_val not in portalDict.keys():
-                    portalDict[self.grid_pts_li[i].portal_val] = [i]
+                if self.grid_pts_li[i].portal_val not in portal_dict.keys():
+                    portal_dict[self.grid_pts_li[i].portal_val] = [i]
                 else:
-                    portalDict[self.grid_pts_li[i].portal_val] += [i]
-        for key in portalDict.keys():
-            node1, node2 = portalDict[key]
-            self.grid_pts_li[node1].portal = self.grid_pts_li[node2]
-            self.grid_pts_li[node2].portal = self.grid_pts_li[node1]
+                    portal_dict[self.grid_pts_li[i].portal_val] += [i]
+        for key in portal_dict.keys():
+            portal_1, portal_2 = portal_dict[key]
+            self.grid_pts_li[portal_1].portal = self.grid_pts_li[portal_2]
+            self.grid_pts_li[portal_2].portal = self.grid_pts_li[portal_1]
+
+    def go_home(self):
+        for grid_pt in self.grid_pts_li:
+            if grid_pt.ghost_home:
+                grid_pt_A = grid_pt
+                break
+        grid_pt_B = grid_pt_A.neighbors[gf.direction["LEFT"]]
+        mid = (grid_pt_A.position + grid_pt_B.position) / 2.0
+        mid = Vector(int(mid.x), int(mid.y))
+        vec = Vector(self.ghost_home_li[0].position.x, self.ghost_home_li[0].position.y)
+
+        for grid_pt in self.ghost_home_li:
+            grid_pt.position -= vec
+            grid_pt.position += mid
+            for temp in self.grid_pts_li:
+                if grid_pt.position.x == temp.position.x and grid_pt.position.y == temp.position.y:
+                    break
+            self.maze_grid.append(grid_pt)
+
+        A = self.get_grid_pt_from_li(grid_pt_A, self.grid_pts_li)
+        B = self.get_grid_pt_from_li(grid_pt_B, self.grid_pts_li)
+        H = self.get_grid_pt_from_li(self.ghost_home_li[0], self.grid_pts_li)
+        A.neighbors[gf.direction["LEFT"]] = H
+        B.neighbors[gf.direction["RIGHT"]] = H
+        H.neighbors[gf.direction["RIGHT"]] = A
+        H.neighbors[gf.direction["LEFT"]] = B
+
+    def get_grid_pt_from_li(self, grid_pt, li):
+        if grid_pt is not None:
+            for temp in li:
+                if grid_pt.row == temp.row and grid_pt.column == temp.column:
+                    return temp
+        return grid_pt
 
     def draw(self):
         for grid_pt in self.grid_pts_li:
+            grid_pt.draw()
+        for grid_pt in self.ghost_home_li:
             grid_pt.draw()
 
 
 class Food:
     def __init__(self, settings, screen, x, y):
+        self.name = "food"
         self.settings = settings
         self.screen = screen
         self.position = Vector(x, y)
@@ -155,7 +214,8 @@ class Food:
 
 class PowerUp(Food):
     def __init__(self, settings, screen, x, y):
-        super(PowerUp, self).__init__(settings, screen, x, y)
+        super().__init__(settings, screen, x, y)
+        self.name = "power up"
         self.timer = 0
         self.radius = self.settings.power_up_radius
 

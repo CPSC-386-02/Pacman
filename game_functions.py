@@ -27,9 +27,10 @@ def check_events():
             sys.exit()
 
 
-def update_screen(settings, screen, pacman, grid_pts, foods):
+def update_screen(settings, screen, pacman, grid_pts, foods, ghosts):
     screen.fill(settings.bg_color)
     grid_pts.draw()
     foods.draw()
     pacman.draw()
+    ghosts.draw()
     pg.display.flip()
