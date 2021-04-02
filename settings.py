@@ -1,3 +1,6 @@
+import pygame as pg
+
+
 class Settings:
     def __init__(self):
         self.tile_width = 16
@@ -11,14 +14,15 @@ class Settings:
 
         self.character_speed = 100
         self.pacman_color = (255, 255, 0)
-        self.radius = 10
+        self.pacman_lives = 3
+        self.radius = 5
         self.collide_radius = 5
 
         self.food_points = 10
-        self.food_radius = 5
+        self.food_radius = 2
 
         self.power_up_points = 20
-        self.power_up_radius = 7.5
+        self.power_up_radius = 5
         self.flash_t = 0.1
 
         self.ghost_points = 100
@@ -29,3 +33,13 @@ class Settings:
         self.pinky_color = (255, 100, 150)
         self.inky_color = (100, 255, 255)
         self.clyde_color = (230, 190, 40)
+
+    def get_sprite_sheet(self):
+        self.sprite_sheet = pg.image.load("spritesheet.png").convert()
+        self.sprite_sheet.set_colorkey((255, 0, 255))
+
+    def get_image(self, x, y, width, height):
+        x *= width
+        y *= height
+        self.sprite_sheet.set_clip(pg.Rect(x, y, width, height))
+        return self.sprite_sheet.subsurface(self.sprite_sheet.get_clip())

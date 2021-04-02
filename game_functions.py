@@ -27,10 +27,12 @@ def check_events():
             sys.exit()
 
 
-def update_screen(settings, screen, pacman, grid_pts, foods, ghosts):
+def update_screen(settings, screen, pacman, grid_pts, foods, ghosts, sb, maze):
     screen.fill(settings.bg_color)
-    grid_pts.draw()
+    maze.create_maze()
+    # grid_pts.draw()
     foods.draw()
     pacman.draw()
     ghosts.draw()
+    sb.show_score()
     pg.display.flip()

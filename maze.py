@@ -43,17 +43,16 @@ class Grid_Pnts_Group:
 
         self.create_list(settings, screen, self.maze_grid, self.grid_pts_li)
         self.create_list(settings, screen, self.ghost_home_grid, self.ghost_home_li)
-        print(self.ghost_home_li)
         self.create_portal()
         self.go_home()
         self.ghost_home_li[0].ghost_home_entrance = True
 
     def ghost_home(self):
         return [['0', '0', '+', '0', '0'],
-            ['0', '0', '|', '0', '0'],
-            ['+', '0', '|', '0', '+'],
-            ['+', '-', 'S', '-', '+'],
-            ['+', '0', '0', '0', '+']]
+                ['0', '0', '|', '0', '0'],
+                ['+', '0', '|', '0', '+'],
+                ['+', '-', 'S', '-', '+'],
+                ['+', '0', '0', '0', '+']]
 
     def read_file(self, txt_file):
         f = open(txt_file, "r")
@@ -66,10 +65,14 @@ class Grid_Pnts_Group:
             grid_pt = self.stack.pop()
             self.add_to_list(grid_pt, grid_pts_li)
 
-            left_neighbor = self.get_neighbor(settings, screen, gf.direction["LEFT"], grid_pt.row, grid_pt.column - 1, grid_pts_li, grid)
-            right_neighbor = self.get_neighbor(settings, screen, gf.direction["RIGHT"], grid_pt.row, grid_pt.column + 1, grid_pts_li, grid)
-            up_neighbor = self.get_neighbor(settings, screen, gf.direction["UP"], grid_pt.row - 1, grid_pt.column, grid_pts_li, grid)
-            down_neighbor = self.get_neighbor(settings, screen, gf.direction["DOWN"], grid_pt.row + 1, grid_pt.column, grid_pts_li, grid)
+            left_neighbor = self.get_neighbor(settings, screen, gf.direction["LEFT"], grid_pt.row, grid_pt.column - 1,
+                                              grid_pts_li, grid)
+            right_neighbor = self.get_neighbor(settings, screen, gf.direction["RIGHT"], grid_pt.row, grid_pt.column + 1,
+                                               grid_pts_li, grid)
+            up_neighbor = self.get_neighbor(settings, screen, gf.direction["UP"], grid_pt.row - 1, grid_pt.column,
+                                            grid_pts_li, grid)
+            down_neighbor = self.get_neighbor(settings, screen, gf.direction["DOWN"], grid_pt.row + 1, grid_pt.column,
+                                              grid_pts_li, grid)
 
             grid_pt.neighbors[gf.direction["LEFT"]] = left_neighbor
             grid_pt.neighbors[gf.direction["RIGHT"]] = right_neighbor
@@ -130,10 +133,14 @@ class Grid_Pnts_Group:
     def path_to_follow(self, settings, screen, direction, row, col, path, grid):
         if grid[row][col] == path:
             while grid[row][col] not in self.grid_pt_sym:
-                if direction is gf.direction["LEFT"]:   col -= 1
-                elif direction is gf.direction["RIGHT"]:    col += 1
-                elif direction is gf.direction["UP"]:   row -= 1
-                elif direction is gf.direction["DOWN"]: row += 1
+                if direction is gf.direction["LEFT"]:
+                    col -= 1
+                elif direction is gf.direction["RIGHT"]:
+                    col += 1
+                elif direction is gf.direction["UP"]:
+                    row -= 1
+                elif direction is gf.direction["DOWN"]:
+                    row += 1
             grid_pt = Grid_Pnt(settings, screen, row, col)
             if grid[row][col] == "1":
                 grid_pt.portal_val = grid[row][col]
@@ -198,6 +205,51 @@ class Grid_Pnts_Group:
             grid_pt.draw()
 
 
+class Maze:
+    def __init__(self, settings, screen):
+        self.settings = settings
+        self.screen = screen
+        self.sprite_info = None
+        self.rotate_info = None
+        self.images = []
+        self.flash_images = []
+        self.image_row = 16
+
+    def get_maze_images(self, row=0):
+        self.images = []
+        for x in range(11):
+            self.images.append(
+                self.settings.get_image(x, self.image_row + row, self.settings.tile_width, self.settings.tile_height))
+
+    def rotate(self, image, value):
+        return pg.transform.rotate(image, value * 90)
+
+    def read_file(self, txtfile):
+        f = open(txtfile, "r")
+        lines = [line.rstrip('\n') for line in f]
+        return [line.split(' ') for line in lines]
+
+    def get_maze(self):
+        self.sprite_info = self.read_file("maze_sprites.txt")
+        self.rotate_info = self.read_file("maze_rotation.txt")
+
+    def create_maze(self, row=0):
+        self.get_maze_images(row)
+        rows = len(self.sprite_info)
+        cols = len(self.sprite_info[0])
+        for row in range(rows):
+            for col in range(cols):
+                x = col * self.settings.tile_width
+                y = row * self.settings.tile_height
+                val = self.sprite_info[row][col]
+                if val.isdecimal():
+                    rotVal = self.rotate_info[row][col]
+                    image = self.rotate(self.images[int(val)], int(rotVal))
+                    self.screen.blit(image, (x, y))
+                if val == '=':
+                    self.screen.blit(self.images[10], (x, y))
+
+
 class Food:
     def __init__(self, settings, screen, x, y):
         self.name = "food"
@@ -209,7 +261,9 @@ class Food:
 
     def draw(self):
         if self.appear:
-            pg.draw.circle(self.screen, (255, 255, 255), self.position.asInt(),  self.radius)
+            position = self.position.asInt()
+            position = (int(position[0] + self.settings.tile_width / 2), int(position[1] + self.settings.tile_width / 2))
+            pg.draw.circle(self.screen, (255, 255, 255), position, self.radius)
 
 
 class PowerUp(Food):
@@ -244,9 +298,11 @@ class FoodGroup:
         for row in range(len(grid)):
             for col in range(len(grid[0])):
                 if grid[row][col] == 'p':
-                    self.food_list.append(Food(self.settings, self.screen, col * self.settings.tile_width, row * self.settings.tile_height))
+                    self.food_list.append(Food(self.settings, self.screen, col * self.settings.tile_width,
+                                               row * self.settings.tile_height))
                 elif grid[row][col] == 'P':
-                    food = PowerUp(self.settings, self.screen, col * self.settings.tile_width, row * self.settings.tile_height)
+                    food = PowerUp(self.settings, self.screen, col * self.settings.tile_width,
+                                   row * self.settings.tile_height)
                     self.food_list.append(food)
                     self.power_up_list.append(food)
 

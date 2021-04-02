@@ -4,6 +4,7 @@ import pygame as pg
 from vector import Vector
 import game_functions as gf
 from stack import Stack
+from animation import Animation
 
 
 class Character:
@@ -17,6 +18,9 @@ class Character:
         self.nxt_grid_pt = self.current_grid_pt
         self.position = self.current_grid_pt.position.copy()
         self.appear = True
+        self.color = None
+        self.image = None
+        self.sprite_sheet = self.settings.sprite_sheet
 
     def check_nxt_grid_pt(self):
         if self.nxt_grid_pt is not None:
@@ -46,8 +50,13 @@ class Character:
 
     def draw(self):
         if self.appear:
-            position = self.position.asInt()
-            pg.draw.circle(self.screen, self.color, position, self.settings.radius)
+            if self.image is not None:
+                position = self.position.asTuple()
+                position = (position[0] - self.settings.tile_width / 2, position[1] - self.settings.tile_height / 2)
+                self.screen.blit(self.image, position)
+            else:
+                position = self.position.asInt()
+                pg.draw.circle(self.screen, self.color, position, self.settings.radius)
 
 
 class Pacman(Character):
@@ -55,6 +64,11 @@ class Pacman(Character):
         super().__init__(settings, screen, grid_pts)
         self.color = self.settings.pacman_color
         self.food_list = foods.food_list
+        self.image = self.settings.get_image(4, 0, 32, 32)
+        self.animation = None
+        self.animations = {}
+        Animation.set_up_pacman_animation(self)
+        print(self.animations)
 
     def move_by_key(self, direction):
         if self.direction is gf.direction["STOP"]:
@@ -86,7 +100,7 @@ class Pacman(Character):
                         self.position = self.current_grid_pt.position.copy()
                         self.direction = gf.direction["STOP"]
 
-    def eat_food(self, ghosts):
+    def eat_food(self, ghosts, stats, sb):
         for food in self.food_list:
             dist = (self.position - food.position).magnitudeSquared()
             radius = (food.radius + self.settings.collide_radius) ** 2
@@ -94,9 +108,16 @@ class Pacman(Character):
                 self.food_list.remove(food)
                 if food.name == "power up":
                     ghosts.running_away_mode()
-        return None
+                    stats.score += self.settings.power_up_points
+                    sb.prep_score()
+                else:
+                    stats.score += self.settings.food_points
+                    sb.prep_score()
+                    return True
 
-    def eat_ghost(self, ghosts):
+        return False
+
+    def eat_ghost(self, ghosts, stats, sb):
         for ghost in ghosts:
             dist = (self.position - ghost.position).magnitudeSquared()
             radius = (self.settings.ghost_collide_radius + self.settings.collide_radius) ** 2
@@ -104,11 +125,25 @@ class Pacman(Character):
                 if ghost is not None:
                     if ghost.mode.name == "RUN":
                         ghost.spawn_mode(2)
+                        stats.score += self.settings.ghost_points
+                        sb.prep_score()
 
-        return None
+    def run_animation(self, dt):
+        if self.direction == gf.direction["UP"]:
+            self.animation = self.animations["up"]
+        elif self.direction == gf.direction["DOWN"]:
+            self.animation = self.animations["down"]
+        elif self.direction == gf.direction["LEFT"]:
+            self.animation = self.animations["left"]
+        elif self.direction == gf.direction["RIGHT"]:
+            self.animation = self.animations["right"]
+        elif self.direction == gf.direction["STOP"]:
+            self.animation = self.animations["idle"]
+        self.image = self.animation.update(dt)
 
-    def update(self, dt, ghosts):
+    def update(self, dt, ghosts, stats, sb, sound):
         self.position += self.direction * self.settings.character_speed * dt
+        self.run_animation(dt)
         direction = gf.check_key_down_event()
         if direction:
             self.move_by_key(direction)
@@ -122,9 +157,11 @@ class Pacman(Character):
                     else:
                         self.position = self.current_grid_pt.position.copy()
                         self.direction = gf.direction["STOP"]
-        self.eat_food(ghosts)
-        self.eat_ghost(ghosts)
-
+        if self.eat_food(ghosts, stats, sb):
+            sound.eat_food()
+        # else:
+        #     sound.stop_eating()
+        self.eat_ghost(ghosts, stats, sb)
 
 
 class Ghost(Character):
@@ -135,6 +172,8 @@ class Ghost(Character):
         self.mode = self.mode_stack.pop()
         self.mode_timer = 0
         self.spawn_pt = self.find_spawn_pt()
+        self.animation = None
+        self.animations = {}
 
     def directions(self):
         directions = []
@@ -243,10 +282,37 @@ class Ghost(Character):
     #         self.nxt_grid_pt = self.current_grid_pt.neighbors[self.direction]
     #         self.position = self.current_grid_pt.position.copy()
 
+    def run_animation(self, dt):
+        if self.mode.name == "SPAWN":
+            if self.direction == gf.direction["UP"]:
+                self.animation = self.animations["spawn_up"]
+            elif self.direction == gf.direction["DOWN"]:
+                self.animation = self.animations["spawn_down"]
+            elif self.direction == gf.direction["LEFT"]:
+                self.animation = self.animations["spawn_left"]
+            elif self.direction == gf.direction["RIGHT"]:
+                self.animation = self.animations["spawn_right"]
+
+        if self.mode.name in ["CHASE", "SCATTER"]:
+            if self.direction == gf.direction["UP"]:
+                self.animation = self.animations["up"]
+            elif self.direction == gf.direction["DOWN"]:
+                self.animation = self.animations["down"]
+            elif self.direction == gf.direction["LEFT"]:
+                self.animation = self.animations["left"]
+            elif self.direction == gf.direction["RIGHT"]:
+                self.animation = self.animations["right"]
+
+        if self.mode.name == "RUN":
+            if self.mode_timer >= (self.mode.time * 0.7):
+                self.animation = self.animations["flash"]
+            else:
+                self.animation = self.animations["run"]
+        self.image = self.animation.update(dt)
+
     def update(self, dt, pacman, blinky=None):
         self.appear = True
-        speedMod = self.settings.ghost_speed * self.mode.speed_up_scale
-        self.position += self.direction * speedMod * dt
+        self.position += self.direction * self.settings.ghost_speed * self.mode.speed_up_scale * dt
         self.mode_update(dt)
         if self.mode.name == "CHASE":
             self.chase_goal(pacman, blinky)
@@ -266,10 +332,11 @@ class Ghost(Character):
             if self.mode.name == "SPAWN":
                 if self.position == self.goal:
                     self.mode = self.mode_stack.pop()
+        self.run_animation(dt)
 
 
 class Mode:
-    def __init__(self, name="", time=None, speed_up_scale=1, direction=None):
+    def __init__(self, name="", time=None, speed_up_scale=1.0, direction=None):
         self.name = name
         self.time = time
         self.speed_up_scale = speed_up_scale
@@ -280,12 +347,18 @@ class Blinky(Ghost):
     def __init__(self, settings, screen, grid_pts):
         super().__init__(settings, screen, grid_pts)
         self.color = self.settings.blinky_color
+        self.image = self.settings.get_image(4,2,32,32)
+        Animation.set_up_ghost_animation(self, 2)
+        self.animation = self.animations["up"]
 
 
 class Pinky(Ghost):
     def __init__(self, settings, screen, grid_pts):
         super().__init__(settings, screen, grid_pts)
         self.color = self.settings.pinky_color
+        self.image = self.settings.get_image(0, 3, 32, 32)
+        Animation.set_up_ghost_animation(self, 3)
+        self.animation = self.animations["left"]
 
     def scatter_goal(self):
         self.goal = Vector()
@@ -298,6 +371,9 @@ class Inky(Ghost):
     def __init__(self, settings, screen, grid_pts):
         super().__init__(settings, screen, grid_pts)
         self.color = self.settings.inky_color
+        self.image = self.settings.get_image(2, 4, 32, 32)
+        Animation.set_up_ghost_animation(self, 4)
+        self.animation = self.animations["down"]
 
     def scatter_goal(self):
         self.goal = Vector(self.settings.screen_width, self.settings.screen_height)
@@ -311,6 +387,9 @@ class Clyde(Ghost):
     def __init__(self, settings, screen, grid_pts):
         super().__init__(settings, screen, grid_pts)
         self.color = self.settings.clyde_color
+        self.image = self.settings.get_image(2, 5, 32, 32)
+        Animation.set_up_ghost_animation(self, 5)
+        self.animation = self.animations["down"]
 
     def scatter_goal(self):
         self.goal = Vector(0, self.settings.screen_height)
@@ -323,7 +402,7 @@ class Clyde(Ghost):
             self.goal = pacman.position + pacman.direction * self.settings.tile_width * 4
 
 
-class Ghost_Group():
+class Ghost_Group:
     def __init__(self, settings, screen, grid_pts):
         self.settings = settings
         self.screen = screen
