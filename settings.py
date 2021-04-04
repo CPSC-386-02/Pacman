@@ -11,21 +11,23 @@ class Settings:
         self.screen_height = self.rows * self.tile_height
         self.bg_color = (0, 0, 0)
         self.title = "Pacman"
+        self.game_active = False
 
         self.character_speed = 100
         self.pacman_color = (255, 255, 0)
-        self.pacman_lives = 3
+        self.starting_lives = 3
+        self.pacman_lives = self.starting_lives
         self.radius = 5
         self.collide_radius = 5
 
         self.food_points = 10
         self.food_radius = 2
 
-        self.power_up_points = 20
+        self.power_up_points = 50
         self.power_up_radius = 5
         self.flash_t = 0.1
 
-        self.ghost_points = 100
+        # self.ghost_points = 100
         self.ghost_speed = 75
         self.ghost_collide_radius = 5
 
@@ -33,6 +35,9 @@ class Settings:
         self.pinky_color = (255, 100, 150)
         self.inky_color = (100, 255, 255)
         self.clyde_color = (230, 190, 40)
+
+        self.ghost_eaten_counter = 0
+        self.ghost_points = [200, 400, 800, 1600]
 
     def get_sprite_sheet(self):
         self.sprite_sheet = pg.image.load("spritesheet.png").convert()

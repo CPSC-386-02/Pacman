@@ -17,22 +17,20 @@ class Grid_Pnt:
         self.ghost_home = False
         self.ghost_home_entrance = False
         self.ghost_spawn_pt = False
-
-    def draw(self):
-        for n in self.neighbors.keys():
-            if self.neighbors[n] is not None:
-                line_start = self.position.asTuple()
-                line_end = self.neighbors[n].position.asTuple()
-                pg.draw.line(self.screen, (255, 255, 255), line_start, line_end, 4)
-                pg.draw.circle(self.screen, (255, 0, 0), self.position.asInt(), 12)
+        # Added 4/2/21
+        self.pacman_start_pt = False
+        self.blinky_start_pt = False
+        self.pinky_start_pt = False
+        self.inky_start_pt = False
+        self.clyde_start_pt = False
+        self.fruit_start_pt = False
 
 
 class Grid_Pnts_Group:
     def __init__(self, settings, screen, txt_file):
         self.settings = settings
         self.screen = screen
-
-        self.grid_pt_sym = ["+"] + ["1"] + ["H"] + ["S"]
+        self.grid_pt_sym = ["+"] + ["1"] + ["H"] + ["S"] + ["P"] + ["B"] + ["I"] + ["C"] + ["F"]
 
         self.grid_pts_li = []
         self.ghost_home_li = []
@@ -43,16 +41,19 @@ class Grid_Pnts_Group:
 
         self.create_list(settings, screen, self.maze_grid, self.grid_pts_li)
         self.create_list(settings, screen, self.ghost_home_grid, self.ghost_home_li)
+        print(self.ghost_home_li)
         self.create_portal()
         self.go_home()
         self.ghost_home_li[0].ghost_home_entrance = True
 
     def ghost_home(self):
-        return [['0', '0', '+', '0', '0'],
-                ['0', '0', '|', '0', '0'],
-                ['+', '0', '|', '0', '+'],
-                ['+', '-', 'S', '-', '+'],
-                ['+', '0', '0', '0', '+']]
+        return [
+            ['0', '0', 'B', '0', '0'],
+            ['0', '0', '|', '0', '0'],
+            ['+', '0', '|', '0', '+'],
+            ['I', '-', 'S', '-', 'C'],
+            ['+', '0', '0', '0', '+']
+        ]
 
     def read_file(self, txt_file):
         f = open(txt_file, "r")
@@ -89,6 +90,8 @@ class Grid_Pnts_Group:
             for col in range(len(grid[0])):
                 if grid[row][col] in self.grid_pt_sym:
                     grid_pt = Grid_Pnt(settings, screen, row, col)
+                    if grid[row][col] == "B":
+                        grid_pt.blinky_start_pt = True
                     if grid[row][col] == "1":
                         grid_pt.portal_val = grid[row][col]
                     return grid_pt
@@ -130,6 +133,7 @@ class Grid_Pnts_Group:
         else:
             return None
 
+    # Modified 4/2/21
     def path_to_follow(self, settings, screen, direction, row, col, path, grid):
         if grid[row][col] == path:
             while grid[row][col] not in self.grid_pt_sym:
@@ -148,6 +152,15 @@ class Grid_Pnts_Group:
                 grid_pt.ghost_home = True
             if grid[row][col] == "S":
                 grid_pt.ghost_spawn_pt = True
+                grid_pt.pinky_start_pt = True
+            if grid[row][col] == "P":
+                grid_pt.pacman_start_pt = True
+            if grid[row][col] == "I":
+                grid_pt.inky_start_pt = True
+            if grid[row][col] == "C":
+                grid_pt.clyde_start_pt = True
+            if grid[row][col] == "F":
+                grid_pt.fruit_start_pt = True
             return grid_pt
         else:
             return None
@@ -248,68 +261,3 @@ class Maze:
                     self.screen.blit(image, (x, y))
                 if val == '=':
                     self.screen.blit(self.images[10], (x, y))
-
-
-class Food:
-    def __init__(self, settings, screen, x, y):
-        self.name = "food"
-        self.settings = settings
-        self.screen = screen
-        self.position = Vector(x, y)
-        self.appear = True
-        self.radius = self.settings.food_radius
-
-    def draw(self):
-        if self.appear:
-            position = self.position.asInt()
-            position = (int(position[0] + self.settings.tile_width / 2), int(position[1] + self.settings.tile_width / 2))
-            pg.draw.circle(self.screen, (255, 255, 255), position, self.radius)
-
-
-class PowerUp(Food):
-    def __init__(self, settings, screen, x, y):
-        super().__init__(settings, screen, x, y)
-        self.name = "power up"
-        self.timer = 0
-        self.radius = self.settings.power_up_radius
-
-    def update(self, dt):
-        self.timer += dt
-        if self.timer >= self.settings.flash_t:
-            self.appear = not self.appear
-            self.timer = 0
-
-
-class FoodGroup:
-    def __init__(self, screen, settings, food_file):
-        self.screen = screen
-        self.settings = settings
-        self.food_list = []
-        self.power_up_list = []
-        self.create_food_list(food_file)
-
-    def read_file(self, food_file):
-        f = open(food_file, "r")
-        lines = [line.rstrip('\n') for line in f]
-        return [line.split(' ') for line in lines]
-
-    def create_food_list(self, food_file):
-        grid = self.read_file(food_file)
-        for row in range(len(grid)):
-            for col in range(len(grid[0])):
-                if grid[row][col] == 'p':
-                    self.food_list.append(Food(self.settings, self.screen, col * self.settings.tile_width,
-                                               row * self.settings.tile_height))
-                elif grid[row][col] == 'P':
-                    food = PowerUp(self.settings, self.screen, col * self.settings.tile_width,
-                                   row * self.settings.tile_height)
-                    self.food_list.append(food)
-                    self.power_up_list.append(food)
-
-    def update(self, dt):
-        for power_up in self.power_up_list:
-            power_up.update(dt)
-
-    def draw(self):
-        for food in self.food_list:
-            food.draw()

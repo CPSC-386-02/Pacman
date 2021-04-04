@@ -1,5 +1,6 @@
 class Animation:
-    def __init__(self, animation_type):
+    def __init__(self, settings, animation_type):
+        self.settings = settings
         self.type = animation_type
         self.frames = []
         self.current_frame = 0
@@ -41,8 +42,8 @@ class Animation:
             if self.current_frame == len(self.frames) - 1:
                 self.finished = True
 
-    def set_up_pacman_animation(self):
-        animations = Animation("loop")
+    def set_up_pacman_animation(self, settings):
+        animations = Animation(settings, "loop")
         animations.speed = 30
         animations.add_frame(self.settings.get_image(4, 0, 32, 32))
         animations.add_frame(self.settings.get_image(0, 0, 32, 32))
@@ -50,7 +51,7 @@ class Animation:
         animations.add_frame(self.settings.get_image(0, 0, 32, 32))
         self.animations["left"] = animations
 
-        animations = Animation("loop")
+        animations = Animation(settings, "loop")
         animations.speed = 30
         animations.add_frame(self.settings.get_image(4, 0, 32, 32))
         animations.add_frame(self.settings.get_image(1, 0, 32, 32))
@@ -58,7 +59,7 @@ class Animation:
         animations.add_frame(self.settings.get_image(1, 0, 32, 32))
         self.animations["right"] = animations
 
-        animations = Animation("loop")
+        animations = Animation(settings, "loop")
         animations.speed = 30
         animations.add_frame(self.settings.get_image(4, 0, 32, 32))
         animations.add_frame(self.settings.get_image(2, 0, 32, 32))
@@ -66,7 +67,7 @@ class Animation:
         animations.add_frame(self.settings.get_image(2, 0, 32, 32))
         self.animations["down"] = animations
 
-        animations = Animation("loop")
+        animations = Animation(settings, "loop")
         animations.speed = 30
         animations.add_frame(self.settings.get_image(4, 0, 32, 32))
         animations.add_frame(self.settings.get_image(3, 0, 32, 32))
@@ -74,48 +75,48 @@ class Animation:
         animations.add_frame(self.settings.get_image(3, 0, 32, 32))
         self.animations["up"] = animations
 
-        animations = Animation("once")
+        animations = Animation(settings, "once")
         animations.speed = 10
         for x in range(11):
             animations.add_frame(self.settings.get_image(x, 7, 32, 32))
         self.animations["death"] = animations
 
-        animations = Animation("static")
+        animations = Animation(settings, "static")
         animations.add_frame(self.settings.get_image(4, 0, 32, 32))
         self.animations["idle"] = animations
 
-    def set_up_ghost_animation(self, ghost_type):
-        animations = Animation("loop")
+    def set_up_ghost_animation(self, settings,  ghost_type):
+        animations = Animation(settings, "loop")
         animations.speed = 10
         animations.add_frame(self.settings.get_image(0, ghost_type, 32, 32))
         animations.add_frame(self.settings.get_image(1, ghost_type, 32, 32))
         self.animations["up"] = animations
 
-        animations = Animation("loop")
+        animations = Animation(settings, "loop")
         animations.speed = 10
         animations.add_frame(self.settings.get_image(2, ghost_type, 32, 32))
         animations.add_frame(self.settings.get_image(3, ghost_type, 32, 32))
         self.animations["down"] = animations
 
-        animations = Animation("loop")
+        animations = Animation(settings, "loop")
         animations.speed = 10
         animations.add_frame(self.settings.get_image(4, ghost_type, 32, 32))
         animations.add_frame(self.settings.get_image(5, ghost_type, 32, 32))
         self.animations["left"] = animations
 
-        animations = Animation("loop")
+        animations = Animation(settings, "loop")
         animations.speed = 10
         animations.add_frame(self.settings.get_image(6, ghost_type, 32, 32))
         animations.add_frame(self.settings.get_image(7, ghost_type, 32, 32))
         self.animations["right"] = animations
 
-        animations = Animation("loop")
+        animations = Animation(settings, "loop")
         animations.speed = 10
         animations.add_frame(self.settings.get_image(0, 6, 32, 32))
         animations.add_frame(self.settings.get_image(1, 6, 32, 32))
         self.animations["run"] = animations
 
-        animations = Animation("loop")
+        animations = Animation(settings, "loop")
         animations.speed = 10
         animations.add_frame(self.settings.get_image(0, 6, 32, 32))
         animations.add_frame(self.settings.get_image(2, 6, 32, 32))
@@ -123,22 +124,22 @@ class Animation:
         animations.add_frame(self.settings.get_image(3, 6, 32, 32))
         self.animations["flash"] = animations
 
-        animations = Animation("static")
+        animations = Animation(settings, "static")
         animations.speed = 10
         animations.add_frame(self.settings.get_image(4, 6, 32, 32))
         self.animations["spawn_up"] = animations
 
-        animations = Animation("static")
+        animations = Animation(settings, "static")
         animations.speed = 10
         animations.add_frame(self.settings.get_image(5, 6, 32, 32))
         self.animations["spawn_down"] = animations
 
-        animations = Animation("static")
+        animations = Animation(settings, "static")
         animations.speed = 10
         animations.add_frame(self.settings.get_image(6, 6, 32, 32))
         self.animations["spawn_left"] = animations
 
-        animations = Animation("static")
+        animations = Animation(settings, "static")
         animations.speed = 10
         animations.add_frame(self.settings.get_image(7, 6, 32, 32))
         self.animations["spawn_right"] = animations

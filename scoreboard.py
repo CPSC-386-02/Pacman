@@ -1,5 +1,5 @@
 import pygame.font
-
+import pickle
 
 class Scoreboard:
     def __init__(self, settings, screen, stats):
@@ -10,7 +10,7 @@ class Scoreboard:
 
         self.text_color = (255, 255, 255)
         self.font = pygame.font.Font("PressStart2P-Regular.ttf", 16)
-
+        self.score_int = 0
         self.score_label_position = (0, 0)
         self.score_position = (0, 16)
         self.level_label_position = (368, 0)
@@ -29,6 +29,12 @@ class Scoreboard:
         rounded_score = int(round(self.stats.score, -1))
         score_str = "{:,}".format(rounded_score)
         self.score = self.font.render(score_str.zfill(8), 1, self.text_color)
+
+    def check_high_score(self):
+        if self.stats.score > self.stats.high_score:
+            self.stats.high_score = self.stats.score
+            with open('score.dat', 'wb') as file:
+                pickle.dump(self.stats.high_score, file)
 
     def prep_level_label(self):
         self.level_label = self.font.render("LEVEL", 1, self.text_color)
